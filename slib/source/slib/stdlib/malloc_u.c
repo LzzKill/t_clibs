@@ -33,10 +33,10 @@ static MemBlock *last = NULL; /* 永远指向尾部 */
 
 static void *extend_heap(size_t size) { /*TODO: Use MMAP*/
   void *heap = sbrk(0);
-  if (sbrk(size + MemBlock_size) == NULL_p) /* 算上结构体本身大小 */
+  if (sbrk(size) == NULL_p) /* 算上结构体本身大小 */
     return NULL;
   MemBlock *block = (MemBlock *)heap;
-  block->size = size + MemBlock_size;
+  block->size = size;
   block->next = block->back = NULL;
   return block;
 }
@@ -66,20 +66,22 @@ static void marge_heap(MemBlock *block) {
 void *malloc(size_t size) {
   if (size == 0)
     return NULL;
-  size = (size + 7) & ~7; /* 内存对齐 */
+
+  size = (size + 7) & ~7;
   size_t total_size = size + sizeof(MemBlock);
 
-  if (!head) { /* 头部指针初始化 */
-    head = extend_heap(MemBlock_size);
-    if (!head) {
-      /* TODO: 错误处理*/
-      return NULL;
-    }
-    head->size = 0;
-    last = head->next;
+  /* 初始化 head（哨兵节点）*/
+  if (!head) {
+    // 注意：head 不需要从堆分配，我们可以直接使用静态变量
+    static MemBlock head_node;
+    head = &head_node;
+    head->size = 0; // 哨兵节点大小为 0
+    head->next = NULL;
+    head->back = NULL;
+    last = head; // 初始化 last 指向 head
   }
 
-  /* Bast-Fit */
+  // Best-Fit 搜索
   MemBlock *best = NULL;
   MemBlock *p = head->next;
   while (p) {
@@ -89,49 +91,69 @@ void *malloc(size_t size) {
     p = p->next;
   }
 
-  /* 没有合适的块，拓展堆 */
+  // 没有合适的块，扩展堆
   if (!best) {
     best = extend_heap(total_size);
-    MemBlock *last = head;
-    while (last->next)
-      last = last->next;
-    last->next = best;
+    if (!best)
+      return NULL;
+
+    // 插入到链表末尾（保持地址有序）
     best->back = last;
+    best->next = NULL;
+    if (last)
+      last->next = best;
+    last = best;
   }
 
-  /* 拆分块 */
-  if (best->size - total_size >=
-      MemBlock_size + 8) { // 至少能放下一个块头+8字节
-    MemBlock *split = (MemBlock *)best + 1;
+  /* 分割块（如果剩余空间足够大）*/
+  if (best->size - total_size >= sizeof(MemBlock) + 8) {
+    MemBlock *split = (MemBlock *)((void *)best + total_size);
+
     split->size = best->size - total_size;
-    split->back = best;
     split->next = best->next;
-    if (split->next)
-      split->next->back = split;
+    split->back = best;
+
+    if (best->next)
+      best->next->back = split;
     best->next = split;
+
+    /* 如果分割的块是最后一个，更新 last */
+    if (last == best) last = split;
+
     best->size = total_size;
   }
 
-  /* 移除块 */
+	/* 移除块 */
   if (best->back)
     best->back->next = best->next;
   if (best->next)
     best->next->back = best->back;
+
+  /* 如果移除的是最后一个节点，更新 last */
+  if (last == best)
+    last = best->back;
+
   return (void *)best + MemBlock_size;
 }
 
 void free(void *ptr) {
   if (!ptr)
     return;                              /* 此处应该Abrt */
-  MemBlock *block = (MemBlock *)ptr - 1; /* 得到原始指针 */
+  MemBlock *block = (MemBlock *)((void*)(ptr) - MemBlock_size); /* 得到原始指针 */
                                          /* 合并这个块 */
+
+	/*
+	 * 如果元数据是好的，那么不必管他
+	 * 如果元数据被篡改，Ub，不必管他
+	 * */
+
   block->next = head->next;
   block->back = head;
   if (head->next)
     head->next->back = block;
   head->next = block;
 
-  marge_heap(block);
+  /* marge_heap(block); */ /* 限于设计的问题，无法合并，临时决定不合并 */
 }
 
 #endif
