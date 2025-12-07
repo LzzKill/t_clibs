@@ -15,6 +15,7 @@
  * The C99 standard only defines it as a value of (void*)0, and here it is defined as a macro.
  * C99 标准只定义了它是一个 (voic*)0 的值，此处用宏实现。
  */
+#undef NULL
 #define NULL ((void*)0)
 
 #ifdef __GNUC__
@@ -37,6 +38,7 @@ typedef unsigned long size_t
 typedef long ptrdiff_t
 #endif
 
+#undef offsetof
 #define offsetof(type, member) (size_t)(&((type*)0)->member)
 /*                                     ^^^^^^^^^^^^^^^^^^^^ 
  * Force 0 to be converted into a structure pointer and take the address of a member.

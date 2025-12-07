@@ -31,9 +31,5 @@
  * 字符 = 存在于所有受到 ISO 支持的字符集
  * */
 
-/*
- * NOTE: In C++, the above definition is useless.
- * NOTE: 在 C++ ，上述定义毫无作用。
- * */
 #endif
 
