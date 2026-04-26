@@ -8,23 +8,23 @@
 /* ISO C99 Standard */
 /* Non-standard incomplete implementation */
 
-#if linux
+#if unix
 
 #include "slib/stdlib.h"
 
-#include <unistd.h>
+#include <sys/mman.h>
 
 #define NULL_p ((void *)-1)
 
 /* #include "slib/stddef.h" */
 
-typedef struct MemBlock {
+typedef struct Block {
   size_t size; /* 算上结构体本身的大小 */
-  struct MemBlock *next;
-  struct MemBlock *back;
+	int free;
+	struct Block * next;
 } MemBlock; /* Full size: 24Bit */
 
-static size_t MemBlock_size = sizeof(MemBlock);
+static const size_t MemBlock_size = sizeof(MemBlock);
 
 static MemBlock *head = NULL; /* 头指针不可分配 */
 static MemBlock *last = NULL; /* 永远指向尾部 */
